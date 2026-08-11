@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-import json
+import json 
 import os
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator , Sequence
 from pathlib import Path
 from typing import Any
+
 
 from dotenv import load_dotenv
 from fastembed import SparseTextEmbedding
 from qdrant_client import QdrantClient, models
 from sentence_transformers import SentenceTransformer
 
-
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -23,11 +21,8 @@ DATA_DIR = BASE_DIR / "data"
 # First/full database export:
 INPUT_JSONL = DATA_DIR / "products.jsonl"
 
-# For incremental events later, change to:
-# INPUT_JSONL = DATA_DIR / "products_pending_changes.jsonl"
-
-QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY") or None
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 QDRANT_COLLECTION = os.getenv(
     "QDRANT_COLLECTION",
     "shopping-products-v1",
@@ -36,39 +31,31 @@ QDRANT_COLLECTION = os.getenv(
 DENSE_VECTOR_NAME = "dense"
 SPARSE_VECTOR_NAME = "sparse"
 
-# Assumes that by "Google Gamma" you mean Google's EmbeddingGemma model.
-# A normal generative Gemma model should not be used as an embedding model.
+
 DENSE_MODEL_NAME = "google/embeddinggemma-300m"
 DENSE_VECTOR_SIZE = 768
 
 SPARSE_MODEL_NAME = "Qdrant/bm25"
 
-# Keep this identical when creating query sparse vectors.
 BM25_LANGUAGE = "english"
 BM25_AVG_DOCUMENT_LENGTH = 100.0
 
 READ_BATCH_SIZE = 100
 DENSE_ENCODING_BATCH_SIZE = 32
 
-# Set True only when intentionally rebuilding the entire collection.
-# This deletes the exact Qdrant collection before recreating it.
+
 RECREATE_COLLECTION = False
 
 
-# ---------------------------------------------------------------------------
-# JSONL reading
-# ---------------------------------------------------------------------------
-
-def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
-    if not path.exists():
+def read_jsonl(path: Path) -> Iterator[dict[str , Any]]:
+   if not path.exists():
         raise FileNotFoundError(f"JSONL input does not exist: {path}")
 
-    with path.open("r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            line = line.strip()
+   with path.open("r" , encoding="utf-8") as file:
+       for line_number , line in enumerate(file , start=1):
 
             if not line:
-                continue
+               continue
 
             try:
                 record = json.loads(line)
@@ -83,7 +70,7 @@ def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
                 )
 
             yield record
-
+            
 
 def batched(
     records: Iterator[dict[str, Any]],
@@ -113,8 +100,7 @@ def get_record_id(record: dict[str, Any]) -> str:
         raise ValueError("A JSONL record does not contain '_id' or 'id'.")
 
     return str(record_id)
-
-
+         
 def qdrant_point_id(record_id: str) -> str:
     """
     Qdrant point IDs must be an integer or UUID.
@@ -157,7 +143,6 @@ def get_document_text(record: dict[str, Any]) -> str:
 
     return str(text).strip()
 
-
 def build_payload(record: dict[str, Any]) -> dict[str, Any]:
     metadata = record.get("metadata") or {}
 
@@ -186,15 +171,12 @@ def build_payload(record: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(payload, default=str))
 
 
-# ---------------------------------------------------------------------------
-# Qdrant collection
-# ---------------------------------------------------------------------------
-
 def create_client() -> QdrantClient:
     return QdrantClient(
         url=QDRANT_URL,
         api_key=QDRANT_API_KEY,
         timeout=120,
+        cloud_inference=True
     )
 
 
@@ -215,12 +197,11 @@ def ensure_collection(client: QdrantClient) -> None:
         vectors_config={
             DENSE_VECTOR_NAME: models.VectorParams(
                 size=DENSE_VECTOR_SIZE,
-                distance=models.Distance.DOT,
+                distance=models.Distance.COSINE,
             )
         },
         sparse_vectors_config={
             SPARSE_VECTOR_NAME: models.SparseVectorParams(
-                # Required for Qdrant/FastEmbed BM25.
                 modifier=models.Modifier.IDF,
             )
         },
@@ -229,7 +210,6 @@ def ensure_collection(client: QdrantClient) -> None:
     create_payload_indexes(client)
 
     print(f"Created collection: {QDRANT_COLLECTION}")
-
 
 def create_payload_indexes(client: QdrantClient) -> None:
     keyword_fields = [
@@ -250,6 +230,8 @@ def create_payload_indexes(client: QdrantClient) -> None:
             field_schema=models.PayloadSchemaType.KEYWORD,
             wait=True,
         )
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +260,7 @@ def load_sparse_model() -> SparseTextEmbedding:
     )
 
 
+
 # ---------------------------------------------------------------------------
 # Upserts and deletions
 # ---------------------------------------------------------------------------
@@ -304,7 +287,7 @@ def upsert_records(
         document_texts,
         batch_size=DENSE_ENCODING_BATCH_SIZE,
         normalize_embeddings=True,
-        show_progress_bar=False,
+        show_progress_bar=True
     )
 
     sparse_vectors = list(sparse_model.embed(texts))
@@ -353,7 +336,6 @@ def upsert_records(
 
     return len(points)
 
-
 def delete_records(
     client: QdrantClient,
     records: Sequence[dict[str, Any]],
@@ -377,11 +359,7 @@ def delete_records(
     return len(point_ids)
 
 
-# ---------------------------------------------------------------------------
-# Indexing
-# ---------------------------------------------------------------------------
-
-def index_products() -> tuple[int, int, int]:
+def index_products() -> tuple[int , int , int]:
     client = create_client()
     ensure_collection(client)
 
@@ -389,12 +367,12 @@ def index_products() -> tuple[int, int, int]:
     sparse_model = load_sparse_model()
 
     processed = 0
-    upserted = 0
+    upserted  = 0
     deleted = 0
 
     records = read_jsonl(INPUT_JSONL)
 
-    for batch_number, batch in enumerate(
+    for batch_number , batch in enumerate(
         batched(records, READ_BATCH_SIZE),
         start=1,
     ):
