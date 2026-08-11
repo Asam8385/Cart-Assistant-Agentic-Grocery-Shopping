@@ -40,7 +40,7 @@ SPARSE_MODEL_NAME = "Qdrant/bm25"
 BM25_LANGUAGE = "english"
 BM25_AVG_DOCUMENT_LENGTH = 100.0
 
-READ_BATCH_SIZE = 100
+READ_BATCH_SIZE = 50
 DENSE_ENCODING_BATCH_SIZE = 32
 
 
@@ -175,7 +175,7 @@ def create_client() -> QdrantClient:
     return QdrantClient(
         url=QDRANT_URL,
         api_key=QDRANT_API_KEY,
-        timeout=120,
+        timeout=180,
         cloud_inference=True
     )
 
