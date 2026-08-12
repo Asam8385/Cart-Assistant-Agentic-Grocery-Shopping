@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from fastembed import SparseTextEmbedding
 from qdrant_client import QdrantClient, models
 from sentence_transformers import SentenceTransformer
-
+ 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
