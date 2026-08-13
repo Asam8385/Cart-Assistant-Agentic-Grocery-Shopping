@@ -1,0 +1,11 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+.env
+.foundry/results
+evaluations/assets
+src/shoppingagent/knowledge_base/data/*.jsonl
+tests
+docs

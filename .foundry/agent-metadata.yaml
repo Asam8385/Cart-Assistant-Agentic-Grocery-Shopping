@@ -1,0 +1,5 @@
+defaultEnvironment: dev
+
+environments:
+  dev:
+    evaluationSuites: []

@@ -1,11 +1,253 @@
-# Python-generated files
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
+
+*.so
+*.pyd
+*.dll
+
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
+.eggs/
+*.egg
+MANIFEST
 
+# Keep the uv lock file committed.
+# uv.lock
+
+
+# ---------------------------------------------------------------------------
 # Virtual environments
-.venv
+# ---------------------------------------------------------------------------
+
+.venv/
+venv/
+env/
+ENV/
+
+
+# ---------------------------------------------------------------------------
+# Environment variables and secrets
+# ---------------------------------------------------------------------------
+
 .env
+.env.*
+!.env.example
+
+secrets/
+*.secret
+*.key
+
+# Local Azure Developer CLI environments can contain credentials.
+.azure/
+
+
+# ---------------------------------------------------------------------------
+# Testing and coverage
+# ---------------------------------------------------------------------------
+
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+test-results/
+junit.xml
+
+.tox/
+.nox/
+hypothesis/
+.pyre/
+
+
+# ---------------------------------------------------------------------------
+# Type checking, linting, and formatting
+# ---------------------------------------------------------------------------
+
+.mypy_cache/
+.pyright/
+.pytype/
+.pyrefly/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+
+# ---------------------------------------------------------------------------
+# IDEs and editors
+# ---------------------------------------------------------------------------
+
+.vscode/
+.idea/
+*.code-workspace
+
+*.swp
+*.swo
+*.swn
+*~
+.project
+.pydevproject
+
+
+# ---------------------------------------------------------------------------
+# Operating-system files
+# ---------------------------------------------------------------------------
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+$RECYCLE.BIN/
+
+
+# ---------------------------------------------------------------------------
+# Logs and runtime files
+# ---------------------------------------------------------------------------
+
+logs/
+*.log
+*.log.*
+*.pid
+*.pid.lock
+
+run/
+tmp/
+temp/
+var/
+
+*.dump
+*.bak
+
+
+# ---------------------------------------------------------------------------
+# Generated knowledge-base exports
+# ---------------------------------------------------------------------------
+
+src/shoppingagent/knowledge_base/data/*.jsonl
+src/shoppingagent/knowledge_base/data/*.json
+src/shoppingagent/knowledge_base/data/*.sha256
+src/shoppingagent/knowledge_base/data/*.manifest
+
+# Keep the directory in Git.
+!src/shoppingagent/knowledge_base/data/.gitkeep
+
+
+# ---------------------------------------------------------------------------
+# Evaluation output
+# ---------------------------------------------------------------------------
+
+evaluation-results/
+evaluations/results/
+evaluations/reports/
+evaluations/generated/
+
+*.eval.json
+*.eval.jsonl
+*.evaluation.json
+*.evaluation.jsonl
+
+# Curated evaluation datasets under evaluations/datasets remain tracked.
+
+
+# ---------------------------------------------------------------------------
+# Microsoft Foundry local/generated state
+# ---------------------------------------------------------------------------
+
+.foundry/results/
+.foundry/cache/
+.foundry/tmp/
+.foundry/logs/
+
+# Keep metadata and reusable evaluation definitions tracked:
+# .foundry/agent-metadata.yaml
+# .foundry/agent-metadata.prod.yaml
+# .foundry/suites/
+# .foundry/datasets/
+# .foundry/evaluators/
+
+
+# ---------------------------------------------------------------------------
+# Qdrant local storage
+# ---------------------------------------------------------------------------
+
+qdrant_storage/
+.qdrant/
+storage/
+snapshots/
+qdrant-snapshots/
+
+
+# ---------------------------------------------------------------------------
+# Local databases
+# ---------------------------------------------------------------------------
+
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+
+mysql-data/
+database-backups/
+
+
+# ---------------------------------------------------------------------------
+# Model and embedding caches
+# ---------------------------------------------------------------------------
+
+.cache/
+huggingface/
+.huggingface/
+sentence_transformers/
+model-cache/
+models/cache/
+
+*.safetensors
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+
+# ---------------------------------------------------------------------------
+# Uploaded user content
+# ---------------------------------------------------------------------------
+
+uploads/
+user-uploads/
+captured-images/
+processed-images/
+
+# Keep curated, anonymized evaluation images under evaluations/assets tracked.
+
+
+# ---------------------------------------------------------------------------
+# Docker and local containers
+# ---------------------------------------------------------------------------
+
+docker-data/
+docker-volumes/
+compose.override.yaml
+docker-compose.override.yml
+
+
+# ---------------------------------------------------------------------------
+# Temporary generated files
+# ---------------------------------------------------------------------------
+
+*.tmp
+*.temp
+*.part
+*.cache
+
+.cache-loader/

@@ -1,0 +1,12 @@
+name: Shopping Agent Evaluation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  placeholder:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "Replace this placeholder with the real workflow."

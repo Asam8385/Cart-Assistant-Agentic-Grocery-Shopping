@@ -1,0 +1,13 @@
+name: shopping-agent-evaluation
+
+agent:
+  name: shopping-agent
+
+dataset:
+  local_uri: evaluations/datasets/smoke.jsonl
+
+evaluators: []
+
+options:
+  pass_threshold: 0.80
+  max_samples: 25

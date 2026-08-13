@@ -1,0 +1,5 @@
+defaultEnvironment: prod
+
+environments:
+  prod:
+    evaluationSuites: []
