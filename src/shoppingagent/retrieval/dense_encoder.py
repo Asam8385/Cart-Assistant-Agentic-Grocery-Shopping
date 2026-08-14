@@ -17,7 +17,7 @@ class DenseQueryEncoder:
     object is shared by the HybridRetriever.
     """
 
-    def __inti__(
+    def __init__(
             self ,
             model: SentenceTransformer,
             * ,
@@ -48,6 +48,11 @@ class DenseQueryEncoder:
         model = SentenceTransformer(
             model_name_or_path=model_name,
             device="cuda",
+        )
+
+        return cls(
+            model,
+            expected_dimension=expected_dimension,
         )
 
     def encode_query(self, query : str) -> list[float]:
