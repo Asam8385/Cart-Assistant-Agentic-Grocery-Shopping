@@ -6,14 +6,18 @@ from .hybrid_retriever import (
     SearchMode,
 )
 from .models import SearchHit
-from .reranker import ExactMatchReranker
+from .reranker import (
+    HuggingFaceReranker,
+    RerankerSettings,
+)
 from .sparse_encoder import SparseQueryEncoder
 
 __all__ = [
     "DenseQueryEncoder",
-    "ExactMatchReranker",
+    "HuggingFaceReranker",
     "HybridProductRetriever",
     "ProductFilters",
+    "RerankerSettings",
     "RetrievalSettings",
     "SearchHit",
     "SearchMode",

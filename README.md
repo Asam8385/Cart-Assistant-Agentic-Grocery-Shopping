@@ -2,7 +2,7 @@
 
 Shopping Agent is an AI-assisted product discovery system for grocery and food-ordering experiences. A user can type a shopping request or upload a photograph of a handwritten list. The system converts the request into structured items, retrieves relevant vendor products, and prepares a result that can later be passed to vendor tools through MCP.
 
-The repository currently contains the knowledge-base pipeline: a synthetic MySQL catalogue, full and incremental JSONL exports, and Qdrant indexing with dense and sparse vectors. The Microsoft Agent Framework orchestration, image-analysis agent, MCP server, and end-user application are planned components.
+The repository currently contains the knowledge-base pipeline and a working retrieval test host: a synthetic MySQL catalogue, full and incremental JSONL exports, Qdrant indexing with dense and sparse vectors, hybrid reciprocal rank fusion (RRF), metadata filtering, and optional Hugging Face cross-encoder reranking. The Microsoft Agent Framework orchestration, image-analysis agent, vendor MCP server, and end-user application remain planned components.
 
 ## Product experience
 
@@ -48,6 +48,14 @@ flowchart LR
     Q --> H["Hybrid retrieval with RRF"]
 ```
 
+## Hybrid retrieval test interface
+
+The local FastAPI host loads EmbeddingGemma, Qdrant BM25, and the small Hugging Face reranker once during application startup. The test page can compare hybrid RRF, dense-only, and sparse-only retrieval, apply vendor/category/brand filters, and enable or disable reranking.
+
+![Shopping Agent hybrid retrieval test](docs/images/retrieval-score-testing.png)
+
+The screenshot shows the implemented retrieval interface querying a 10,000-point Qdrant collection. Each result exposes the fused Qdrant score and optional reranker score to support retrieval debugging and later evaluation.
+
 ## Knowledge-base design
 
 MySQL remains the product source of truth. Qdrant is a derived search index and can be rebuilt from MySQL whenever necessary.
@@ -59,7 +67,7 @@ Each active product variant becomes one JSONL record and one Qdrant point. The p
 - Product, vendor, category, dietary, pricing, stock, SKU, barcode, and source-version metadata in the payload.
 - A deterministic UUID generated from the stable JSONL `_id`.
 
-Both vectors are stored as named vectors in the same Qdrant collection. A future retrieval layer can query both and combine the candidate lists with reciprocal rank fusion (RRF).
+Both vectors are stored as named vectors in the same Qdrant collection. The implemented retrieval layer can query either vector independently or query both and combine their candidate lists with Qdrant reciprocal rank fusion (RRF). An optional `cross-encoder/ms-marco-MiniLM-L-2-v2` reranker rescores the fused candidates before returning the final results.
 
 Chunking and section detection are intentionally not used. A product variant is already a short, atomic retrieval unit; splitting it would separate useful attributes such as brand, size, dietary flags, aliases, and availability. Chunking should only be introduced if the catalogue later contains long, multi-topic descriptions.
 
@@ -69,17 +77,27 @@ Chunking and section detection are intentionally not used. A product variant is 
 shoppingAgent/
 |-- docs/
 |   `-- images/
-|       `-- handwritten-shopping-flow.png
+|       |-- handwritten-shopping-flow.png
+|       `-- retrieval-score-testing.png
 |-- src/shoppingagent/
-|   |-- main.py
-|   `-- knowledge_base/
-|       |-- seed_mysql.py
-|       |-- export_products_jsonl.py
-|       |-- index_products_qdrant.py
-|       |-- track_transaction.py
-|       `-- data/
-|           |-- products.jsonl
-|           `-- products_pending_changes.jsonl
+|   |-- hosting/
+|   |   `-- app.py
+|   |-- knowledge_base/
+|   |   |-- seed_mysql.py
+|   |   |-- export_products_jsonl.py
+|   |   |-- index_products_qdrant.py
+|   |   |-- track_transaction.py
+|   |   `-- data/
+|   |       |-- products.jsonl
+|   |       `-- products_pending_changes.jsonl
+|   |-- retrieval/
+|   |   |-- dense_encoder.py
+|   |   |-- sparse_encoder.py
+|   |   |-- hybrid_retriever.py
+|   |   |-- reranker.py
+|   |   |-- filters.py
+|   |   `-- models.py
+|   `-- main.py
 |-- pyproject.toml
 |-- shoppingagent.drawio
 |-- shoppingagent.drawio.png
@@ -93,6 +111,7 @@ shoppingAgent/
 - MySQL 8 or a compatible MySQL server.
 - A local Qdrant instance or Qdrant Cloud collection.
 - Sufficient disk space for the Hugging Face embedding model cache.
+- An NVIDIA CUDA-capable GPU is optional. CPU inference works but is slower.
 
 ## Installation
 
@@ -114,9 +133,15 @@ $env:MYSQL_DATABASE = "shopping_agent"
 $env:QDRANT_URL = "http://localhost:6333"
 $env:QDRANT_API_KEY = ""
 $env:QDRANT_COLLECTION = "shopping-products-v1"
+
+$env:DENSE_MODEL_NAME = "google/embeddinggemma-300m"
+$env:DENSE_DEVICE = "cuda"
+$env:SPARSE_MODEL_NAME = "Qdrant/bm25"
+$env:RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-2-v2"
+$env:RERANKER_DEVICE = "cuda"
 ```
 
-For Qdrant Cloud, replace `QDRANT_URL` with the cluster URL and set `QDRANT_API_KEY`. Keep the key empty for a local unsecured Qdrant instance.
+For Qdrant Cloud, replace `QDRANT_URL` with the cluster URL and set `QDRANT_API_KEY`. Keep the key empty for a local unsecured Qdrant instance. Use `cpu` for both device settings when CUDA-enabled PyTorch is unavailable.
 
 ## Build the knowledge base
 
@@ -173,6 +198,31 @@ uv run python -m shoppingagent.knowledge_base.index_products_qdrant
 The first run creates `shopping-products-v1` with two named vectors. Later `UPSERT` records replace the existing point because the source `_id` always produces the same Qdrant UUID. A `DELETE` record removes that point, including both vectors and its payload.
 
 `RECREATE_COLLECTION` defaults to `False`. Set it to `True` only when deliberately rebuilding the entire Qdrant collection; doing so deletes the existing collection.
+
+## Run the retrieval test host
+
+With the `uv` project environment:
+
+```powershell
+uv run uvicorn shoppingagent.hosting.app:app --host 127.0.0.1 --port 8000
+```
+
+When using a CUDA-enabled global Python installation with this repository's `src` layout:
+
+```powershell
+C:\Python312\python.exe -m uvicorn shoppingagent.hosting.app:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Application startup loads the dense, sparse, and reranker models, so the first launch may take longer while Hugging Face assets are downloaded and cached.
+
+The interface supports:
+
+- `hybrid`: dense and BM25 candidate retrieval fused with RRF.
+- `dense`: EmbeddingGemma semantic retrieval only.
+- `sparse`: BM25 lexical retrieval only.
+- Optional MiniLM reranking.
+- Vendor, category, and brand payload filters.
+- Configurable result limits and visible diagnostic scores.
 
 ## Incremental updates and deletions
 
@@ -233,8 +283,12 @@ A deletion only needs the stable identity and deletion operation; additional aud
 | EmbeddingGemma dense vectors | Implemented |
 | BM25 sparse vectors | Implemented |
 | Qdrant point upsert and delete | Implemented |
+| Dense-only and sparse-only retrieval | Implemented |
+| Hybrid query and Qdrant RRF fusion | Implemented |
+| Metadata filtering | Implemented |
+| Hugging Face MiniLM reranking | Implemented |
+| FastAPI retrieval test interface | Implemented |
 | Outbox acknowledgement after Qdrant success | Not implemented |
-| Hybrid query and RRF retrieval API | Not implemented |
 | Image-analysis agent | Planned |
 | Microsoft Agent Framework orchestration | Planned |
 | Vendor MCP server | Planned |

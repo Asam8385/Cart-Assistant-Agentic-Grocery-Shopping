@@ -97,7 +97,7 @@ class RetrievalSettings:
         reranker_device = (
             os.getenv(
                 "RERANKER_DEVICE",
-                "Cuda",
+                "cuda",
             )
         ).strip() or None
 

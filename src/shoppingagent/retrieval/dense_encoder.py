@@ -27,7 +27,7 @@ class DenseQueryEncoder:
         self._lock = Lock()
         self.expected_dimension = expected_dimension
 
-        dimension = model.get_embedding_dimension()
+        dimension = model.get_sentence_embedding_dimension()
 
         if dimension != expected_dimension:
             raise RuntimeError(
