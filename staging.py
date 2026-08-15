@@ -560,6 +560,7 @@ async def lifespan(
         url=settings.qdrant_url,
         api_key=settings.qdrant_api_key,
         timeout=settings.qdrant_timeout,
+        cloud_inference=True
     )
 
     retriever = HybridProductRetriever(

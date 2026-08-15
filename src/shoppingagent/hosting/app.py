@@ -1,18 +1,20 @@
-from __future__ import annotations
+from __future__ import annotations 
 
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
-from typing import Any, AsyncIterator
+from typing import Any , AsyncIterator
+
 
 from dotenv import load_dotenv
 from fastapi import (
-    FastAPI,
-    HTTPException,
-    Query,
-    Request,
+   FastAPI ,
+   HTTPException , 
+   Query , 
+   Request
 )
+
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment
 from qdrant_client import QdrantClient
@@ -28,7 +30,6 @@ from shoppingagent.retrieval import (
     SparseQueryEncoder,
 )
 
-
 PROJECT_ROOT = Path(
     __file__
 ).resolve().parents[3]
@@ -36,6 +37,7 @@ PROJECT_ROOT = Path(
 PACKAGE_ROOT = Path(
     __file__
 ).resolve().parents[1]
+
 
 # Supports both the recommended root .env and your current
 # src/shoppingagent/.env location.
@@ -49,7 +51,6 @@ load_dotenv(
     override=False,
 )
 
-
 logging.basicConfig(
     level=logging.INFO,
     format=(
@@ -59,7 +60,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(
-    "shoppingagent.hosting"
+   "shoppingagent.hosting"
 )
 
 
@@ -477,15 +478,15 @@ HTML_TEMPLATE_SOURCE = """
 </html>
 """
 
-
 JINJA_ENVIRONMENT = Environment(
-    autoescape=True
+    autoescape=True # safety purpose JINJA USED TO RENDER THE TEMPLETE RENDERING ENGINE FOR 
 )
 
+
 HTML_TEMPLATE = (
-    JINJA_ENVIRONMENT.from_string(
-        HTML_TEMPLATE_SOURCE
-    )
+   JINJA_ENVIRONMENT.from_string(
+      HTML_TEMPLATE_SOURCE
+   )
 )
 
 
@@ -493,22 +494,25 @@ HTML_TEMPLATE = (
 async def lifespan(
     app: FastAPI,
 ) -> AsyncIterator[None]:
+    
     settings = (
         RetrievalSettings.from_environment()
     )
 
-    # 1. Load the dense model.
+        # 1. Load the dense model.
     logger.info(
         "Loading dense model: %s",
         settings.dense_model_name,
     )
 
+
     dense_encoder = DenseQueryEncoder.load(
-        model_name=settings.dense_model_name,
+                model_name=settings.dense_model_name,
         expected_dimension=(
             settings.dense_vector_size
         ),
         device=settings.dense_device,
+        
     )
 
     logger.info("Dense model is ready.")
@@ -535,6 +539,32 @@ async def lifespan(
         settings.reranker_model_name,
     )
 
+
+    logger.info("Dense model is ready.")
+
+    # 2. Load the BM25 sparse model.
+    logger.info(
+        "Loading sparse model: %s",
+        settings.sparse_model_name,
+    )
+
+    sparse_encoder = SparseQueryEncoder.load(
+        model_name=settings.sparse_model_name,
+        language=settings.bm25_language,
+        average_document_length=(
+            settings.bm25_average_document_length
+        ),
+    )
+
+    logger.info("Sparse model is ready.")
+
+    # 3. Load the small Hugging Face reranker.
+    logger.info(
+        "Loading reranker model: %s",
+        settings.reranker_model_name,
+    )
+
+
     reranker = HuggingFaceReranker.load(
         model_name=(
             settings.reranker_model_name
@@ -555,11 +585,11 @@ async def lifespan(
 
     logger.info("Reranker model is ready.")
 
-    # 4. Connect after all local models are loaded.
     qdrant_client = QdrantClient(
         url=settings.qdrant_url,
         api_key=settings.qdrant_api_key,
         timeout=settings.qdrant_timeout,
+        cloud_inference=True
     )
 
     retriever = HybridProductRetriever(
@@ -580,7 +610,7 @@ async def lifespan(
         default_candidate_limit=(
             settings.reranker_candidate_limit
         ),
-    )
+    )   
 
     health = await run_in_threadpool(
         retriever.health_check
@@ -593,6 +623,7 @@ async def lifespan(
         health["points_count"],
     )
 
+
     app.state.retriever = retriever
     app.state.settings = settings
     app.state.startup_health = health
@@ -604,13 +635,14 @@ async def lifespan(
             "Closing Qdrant connection."
         )
         qdrant_client.close()
-
+    
 
 app = FastAPI(
     title="Shopping Agent Retrieval Test",
     version="0.1.0",
     lifespan=lifespan,
 )
+
 
 
 async def run_search(
@@ -651,178 +683,3 @@ async def run_search(
     ) * 1000
 
     return results, elapsed_ms
-
-
-@app.get(
-    "/",
-    response_class=HTMLResponse,
-)
-async def homepage(
-    request: Request,
-    q: str = "",
-    mode: str = "hybrid",
-    limit: int = Query(
-        default=10,
-        ge=1,
-        le=50,
-    ),
-    rerank: bool = True,
-    vendor_key: str | None = None,
-    category_slug: str | None = None,
-    brand: str | None = None,
-) -> HTMLResponse:
-    results: list[Any] = []
-    elapsed_ms = 0.0
-    error: str | None = None
-
-    if q.strip():
-        try:
-            results, elapsed_ms = (
-                await run_search(
-                    request,
-                    query=q,
-                    mode=mode,
-                    limit=limit,
-                    rerank=rerank,
-                    vendor_key=vendor_key,
-                    category_slug=(
-                        category_slug
-                    ),
-                    brand=brand,
-                )
-            )
-        except Exception as exc:
-            logger.exception(
-                "Retrieval request failed."
-            )
-            error = str(exc)
-
-    html = HTML_TEMPLATE.render(
-        query=q,
-        mode=mode,
-        limit=limit,
-        rerank=rerank,
-        vendor_key=vendor_key,
-        category_slug=category_slug,
-        brand=brand,
-        results=results,
-        elapsed_ms=elapsed_ms,
-        error=error,
-        health=(
-            request.app.state.startup_health
-        ),
-    )
-
-    return HTMLResponse(html)
-
-
-@app.get("/api/search")
-async def search_api(
-    request: Request,
-    q: str = Query(
-        min_length=1,
-        max_length=500,
-    ),
-    mode: str = "hybrid",
-    limit: int = Query(
-        default=10,
-        ge=1,
-        le=50,
-    ),
-    rerank: bool = True,
-    vendor_key: str | None = None,
-    category_slug: str | None = None,
-    brand: str | None = None,
-) -> dict[str, Any]:
-    try:
-        results, elapsed_ms = (
-            await run_search(
-                request,
-                query=q,
-                mode=mode,
-                limit=limit,
-                rerank=rerank,
-                vendor_key=vendor_key,
-                category_slug=category_slug,
-                brand=brand,
-            )
-        )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        logger.exception(
-            "Retrieval API failed."
-        )
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(exc),
-        ) from exc
-
-    return {
-        "query": q,
-        "mode": mode,
-        "reranked": rerank,
-        "count": len(results),
-        "elapsed_ms": round(
-            elapsed_ms,
-            2,
-        ),
-        "results": [
-            result.to_dict()
-            for result in results
-        ],
-    }
-
-
-@app.get("/health")
-async def health(
-    request: Request,
-) -> dict[str, Any]:
-    retriever: HybridProductRetriever = (
-        request.app.state.retriever
-    )
-
-    qdrant_health = await run_in_threadpool(
-        retriever.health_check
-    )
-
-    settings: RetrievalSettings = (
-        request.app.state.settings
-    )
-
-    return {
-        **qdrant_health,
-        "dense_model": (
-            settings.dense_model_name
-        ),
-        "dense_dimension": (
-            settings.dense_vector_size
-        ),
-        "sparse_model": (
-            settings.sparse_model_name
-        ),
-        "reranker_model": (
-            settings.reranker_model_name
-        ),
-        "candidate_limit": (
-            settings.reranker_candidate_limit
-        ),
-    }
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "shoppingagent.hosting.app:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=False,
-        workers=1,
-    )
-
-    
