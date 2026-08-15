@@ -683,3 +683,180 @@ async def run_search(
     ) * 1000
 
     return results, elapsed_ms
+
+
+
+@app.get(
+    "/",
+    response_class=HTMLResponse,
+)
+async def homepage(
+    request: Request,
+    q: str = "",
+    mode: str = "hybrid",
+    limit: int = Query(
+        default=10,
+        ge=1,
+        le=50,
+    ),
+    rerank: bool = True,
+    vendor_key: str | None = None,
+    category_slug: str | None = None,
+    brand: str | None = None,
+) -> HTMLResponse:
+    results: list[Any] = []
+    elapsed_ms = 0.0
+    error: str | None = None
+
+    if q.strip():
+        try:
+            results, elapsed_ms = (
+                await run_search(
+                    request,
+                    query=q,
+                    mode=mode,
+                    limit=limit,
+                    rerank=rerank,
+                    vendor_key=vendor_key,
+                    category_slug=(
+                        category_slug
+                    ),
+                    brand=brand,
+                )
+            )
+        except Exception as exc:
+            logger.exception(
+                "Retrieval request failed."
+            )
+            error = str(exc)
+
+            error = str(exc)
+
+    html = HTML_TEMPLATE.render(
+        query=q,
+        mode=mode,
+        limit=limit,
+        rerank=rerank,
+        vendor_key=vendor_key,
+        category_slug=category_slug,
+        brand=brand,
+        results=results,
+        elapsed_ms=elapsed_ms,
+        error=error,
+        health=(
+            request.app.state.startup_health
+        ),
+    )
+
+    return HTMLResponse(html)
+
+
+
+@app.get("/api/search")
+async def search_api(
+    request: Request,
+    q: str = Query(
+        min_length=1,
+        max_length=500,
+    ),
+    mode: str = "hybrid",
+    limit: int = Query(
+        default=10,
+        ge=1,
+        le=50,
+    ),
+    rerank: bool = True,
+    vendor_key: str | None = None,
+    category_slug: str | None = None,
+    brand: str | None = None,
+) -> dict[str, Any]:
+    try:
+        results, elapsed_ms = (
+            await run_search(
+                request,
+                query=q,
+                mode=mode,
+                limit=limit,
+                rerank=rerank,
+                vendor_key=vendor_key,
+                category_slug=category_slug,
+                brand=brand,
+            )
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception(
+            "Retrieval API failed."
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "query": q,
+        "mode": mode,
+        "reranked": rerank,
+        "count": len(results),
+        "elapsed_ms": round(
+            elapsed_ms,
+            2,
+        ),
+        "results": [
+            result.to_dict()
+            for result in results
+        ],
+    }
+
+
+@app.get("/health")
+async def health(
+    request: Request,
+) -> dict[str, Any]:
+    retriever: HybridProductRetriever = (
+        request.app.state.retriever
+    )
+
+    qdrant_health = await run_in_threadpool(
+        retriever.health_check
+    )
+
+    settings: RetrievalSettings = (
+        request.app.state.settings
+    )
+
+    return {
+        **qdrant_health,
+        "dense_model": (
+            settings.dense_model_name
+        ),
+        "dense_dimension": (
+            settings.dense_vector_size
+        ),
+        "sparse_model": (
+            settings.sparse_model_name
+        ),
+        "reranker_model": (
+            settings.reranker_model_name
+        ),
+        "candidate_limit": (
+            settings.reranker_candidate_limit
+        ),
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "shoppingagent.hosting.app:app",
+        host="127.0.0.1",
+        port=8000,
+        reload=False,
+        workers=1,
+    )
