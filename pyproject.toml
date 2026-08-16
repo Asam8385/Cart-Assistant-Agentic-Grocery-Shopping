@@ -8,6 +8,12 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "agent-framework-azure-contentunderstanding>=1.0.0b260813",
+    "azure-ai-agents>=1.1.0",
+    "azure-ai-contentsafety>=1.0.0",
+    "azure-ai-contentunderstanding>=1.2.0b3",
+    "azure-ai-projects>=2.4.0",
+    "azure-identity>=1.25.3",
     "datetime>=6.0",
     "fastapi>=0.141.1",
     "fastembed>=0.8.0",
